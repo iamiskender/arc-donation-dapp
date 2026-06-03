@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arc Network Donation dApp</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Arc Network Donation dApp</h1>
+        
+        <div class="wallet-section">
+            <button id="connect-wallet-btn">Cüzdanı Bağla</button>
+            <p id="wallet-address">Cüzdan: Bağlı Değil</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Toplam Bağış Sayısı</h3>
+                <p id="total-donations">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Toplam Toplanan</h3>
+                <p id="total-amount">0 ETH</p>
+            </div>
+        </div>
+
+        <div class="donation-box">
+            <h2>Destek Ol / Bağış Yap</h2>
+            <div class="input-group">
+                <input type="number" id="donation-amount" placeholder="Miktar (ETH)" step="0.01" min="0">
+                <button id="donate-btn" disabled>Bağış Gönder</button>
+            </div>
+            <p id="status-message"></p>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
