@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arc Donation — On-chain Bağış</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #12100e;
+    --bg3: #1c1815;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --accent: #ff8c42;
+    --accent2: #ffb380;
+    --text: #ece8e3;
+    --muted: #6b6660;
+    --muted2: #a39e96;
+    --green: #34d399;
+    --red: #f87171;
+    --mono: 'Space Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    font-size: 15px;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,140,66,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,140,66,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 48px 20px 80px;
+  }
+
+  .header { margin-bottom: 32px; }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .logo-icon {
+    width: 32px;
+    height: 32px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    color: #14110d;
+    letter-spacing: -1px;
+  }
+
+  .logo-text {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.5px;
+  }
+
+  .logo-text span { color: var(--accent2); }
+
+  .tagline {
+    font-size: 13px;
+    color: var(--muted);
+    font-family: var(--mono);
+    letter-spacing: 0.02em;
+  }
+
+  .connect-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    gap: 12px;
+  }
+
+  .wallet-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .status-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+  .wallet-addr {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted2);
+  }
+
+  .btn {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 18px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-primary { background: var(--accent); color: #14110d; }
+  .btn-primary:hover { background: #ff9d5c; transform: translateY(-1px); }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted2);
+    border: 1px solid var(--border2);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent2); }
+
+  .network-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: rgba(255,140,66,0.1);
+    color: var(--accent2);
+    border: 1px solid rgba(255,140,66,0.2);
+  }
+
+  .network-badge::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 18px;
+  }
+
+  .stat-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .stat-value {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent2);
+  }
+  .stat-value small { font-size: 12px; color: var(--muted2); font-weight: 400; }
+
+  .composer {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 24px;
+    transition: border-color 0.2s;
+  }
+  .composer:focus-within { border-color: rgba(255,140,66,0.4); }
+
+  .composer-label {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .amount-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .amount-input-wrap {
+    flex: 1;
+    position: relative;
+  }
+
+  input[type="text"], input[type="number"] {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input[type="text"]:focus, input[type="number"]:focus { border-color: rgba(255,140,66,0.5); }
+  input::placeholder { color: var(--muted); }
+
+  .currency-tag {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    pointer-events: none;
+  }
+
+  .quick-amounts {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  .quick-btn {
+    flex: 1;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    color: var(--muted2);
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .quick-btn:hover { border-color: var(--accent); color: var(--accent2); }
+  .quick-btn.active { background: rgba(255,140,66,0.12); border-color: var(--accent); color: var(--accent2); }
+
+  textarea {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    line-height: 1.6;
+    resize: vertical;
+    min-height: 56px;
+    outline: none;
+    transition: border-color 0.2s;
+    margin-bottom: 14px;
+  }
+  textarea:focus { border-color: rgba(255,140,66,0.5); }
+  textarea::placeholder { color: var(--muted); }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    left: 24px;
+    margin: 0 auto;
+    max-width: 320px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    padding: 14px 18px;
+    font-size: 13px;
+    color: var(--text);
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-left: 3px solid var(--green); }
+  .toast.error { border-left: 3px solid var(--red); }
+
+  .donations-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .donations-title {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .donations-count { font-family: var(--mono); font-size: 12px; color: var(--accent2); }
+
+  .empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--muted);
+    background: var(--bg2);
+    border: 1px dashed var(--border2);
+    border-radius: 16px;
+  }
+
+  .empty-icon { font-size: 32px; margin-bottom: 12px; opacity: 0.4; }
+  .empty-text { font-size: 13px; font-family: var(--mono); line-height: 1.6; }
+
+  .donation-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 20px;
+    margin-bottom: 10px;
+    animation: slideIn 0.3s ease;
+    transition: border-color 0.2s;
+  }
+  .donation-card:hover { border-color: var(--border2); }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .donation-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .donation-amount {
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--accent2);
+  }
+
+  .donation-time { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  .donation-donor {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted2);
+    margin-bottom: 6px;
+  }
+
+  .donation-message {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .spin {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(0,0,0,0.2);
+    border-top-color: #14110d;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .contract-info {
+    margin-top: 32px;
+    padding: 14px 16px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .contract-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 3px;
+  }
+
+  .contract-addr { font-family: var(--mono); font-size: 12px; color: var(--accent2); }
+
+  .owner-panel {
+    margin-top: 16px;
+    padding: 16px 18px;
+    background: rgba(255,140,66,0.06);
+    border: 1px solid rgba(255,140,66,0.2);
+    border-radius: 14px;
+    display: none;
+  }
+  .owner-panel.visible { display: block; }
+
+  .owner-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent2);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+  }
+
+  .owner-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  a { color: var(--accent2); text-decoration: none; }
+  a:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">Ad</div>
+      <div class="logo-text">Arc<span>Donation</span></div>
+    </div>
+    <div class="tagline">// on-chain bağış · arc testnet</div>
+  </div>
+
+  <div class="connect-bar">
+    <div class="wallet-info">
+      <div class="status-dot" id="statusDot"></div>
+      <div class="wallet-addr" id="walletAddr">Cüzdan bağlı değil</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="network-badge" id="networkBadge" style="display:none">Arc</div>
+      <button class="btn btn-primary" id="connectBtn" onclick="connectWallet()">Cüzdanı Bağla</button>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">toplam bağış</div>
+      <div class="stat-value" id="totalDonatedVal">— <small>USDC</small></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">bağış sayısı</div>
+      <div class="stat-value" id="donationCountVal">—</div>
+    </div>
+  </div>
+
+  <div class="composer">
+    <div class="composer-label">// bağış yap</div>
+    <div class="amount-row">
+      <div class="amount-input-wrap">
+        <input type="text" id="amountInput" placeholder="0.00" inputmode="decimal" disabled>
+        <div class="currency-tag">USDC</div>
+      </div>
+    </div>
+    <div class="quick-amounts">
+      <button class="quick-btn" onclick="setAmount(1)">1</button>
+      <button class="quick-btn" onclick="setAmount(5)">5</button>
+      <button class="quick-btn" onclick="setAmount(10)">10</button>
+      <button class="quick-btn" onclick="setAmount(25)">25</button>
+    </div>
+    <textarea id="messageInput" placeholder="Kısa bir not bırak (opsiyonel)" maxlength="200"></textarea>
+    <button class="btn btn-primary" id="donateBtn" onclick="sendDonation()" disabled style="width:100%;padding:12px;">Bağışla</button>
+  </div>
+
+  <div class="donations-header">
+    <div class="donations-title">// son bağışlar</div>
+    <div class="donations-count" id="donationsCount"></div>
+  </div>
+
+  <div id="donationsList">
+    <div class="empty-state">
+      <div class="empty-icon">◈</div>
+      <div class="empty-text">Cüzdanını bağla ve<br>ilk bağışı sen yap.</div>
+    </div>
+  </div>
+
+  <div class="contract-info">
+    <div>
+      <div class="contract-label">contract adresi</div>
+      <div class="contract-addr">0x54834Dbc98E7B9f2bfc2aC74A784eA75cf9Ffe0E</div>
+    </div>
+    <a href="https://testnet.arcscan.app/address/0x54834Dbc98E7B9f2bfc2aC74A784eA75cf9Ffe0E" target="_blank" class="btn btn-ghost">Arcscan ↗</a>
+  </div>
+
+  <div class="owner-panel" id="ownerPanel">
+    <div class="owner-label">// owner paneli</div>
+    <div class="owner-row">
+      <div class="wallet-addr" id="contractBalanceText">Kontrat bakiyesi: —</div>
+      <button class="btn btn-primary" id="withdrawBtn" onclick="withdrawFunds()">Çek</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const CONTRACT_ADDRESS = "0x54834Dbc98E7B9f2bfc2aC74A784eA75cf9Ffe0E";
+const ARC_CHAIN_ID = 5042002;
+const ARC_CHAIN_ID_HEX = "0x" + ARC_CHAIN_ID.toString(16);
+
+const ABI = [
+  "function donate(string calldata _message) external payable",
+  "function withdraw() external",
+  "function getRecentDonations(uint256 _count) external view returns (tuple(address donor, uint256 amount, uint256 timestamp, string message)[])",
+  "function getDonorTotal(address _donor) external view returns (uint256)",
+  "function getContractBalance() external view returns (uint256)",
+  "function getAllDonationsCount() external view returns (uint256)",
+  "function totalDonated() external view returns (uint256)",
+  "function donationCount() external view returns (uint256)",
+  "function owner() external view returns (address)"
+];
+
+let provider, signer, contract, currentAddress, contractOwner;
+
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.className = 'toast ' + type;
+  t.innerHTML = (type === 'success' ? '✓' : '✕') + ' ' + msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+function setAmount(val) {
+  document.getElementById('amountInput').value = val;
+  document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+async function connectWallet() {
+  if (!window.ethereum) {
+    showToast('MetaMask bulunamadı. Lütfen yükle.', 'error');
+    return;
+  }
+  try {
+    const btn = document.getElementById('connectBtn');
+    btn.innerHTML = '<span class="spin"></span>Bağlanıyor...';
+    btn.disabled = true;
+
+    await window.ethereum.request({ method: 'eth_requestAccounts' });
+    provider = new ethers.providers.Web3Provider(window.ethereum);
+
+    const network = await provider.getNetwork();
+    if (network.chainId !== ARC_CHAIN_ID) {
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: ARC_CHAIN_ID_HEX }]
+        });
+      } catch(e) {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: ARC_CHAIN_ID_HEX,
+            chainName: 'Arc Testnet',
+            rpcUrls: ['https://rpc.testnet.arc.network'],
+            nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
+            blockExplorerUrls: ['https://testnet.arcscan.app']
+          }]
+        });
+      }
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+    }
+
+    signer = provider.getSigner();
+    contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+
+    currentAddress = await signer.getAddress();
+    const short = currentAddress.slice(0,6) + '...' + currentAddress.slice(-4);
+
+    document.getElementById('walletAddr').textContent = short;
+    document.getElementById('statusDot').classList.add('connected');
+    document.getElementById('networkBadge').style.display = 'inline-flex';
+    btn.textContent = 'Bağlandı';
+    btn.disabled = true;
+    btn.style.background = 'rgba(52,211,153,0.15)';
+    btn.style.color = 'var(--green)';
+
+    document.getElementById('amountInput').disabled = false;
+    document.getElementById('donateBtn').disabled = false;
+
+    showToast('Cüzdan bağlandı: ' + short);
+
+    await loadStats();
+    await checkOwner();
+
+    window.ethereum.on('accountsChanged', () => location.reload());
+    window.ethereum.on('chainChanged', () => location.reload());
+
+  } catch(e) {
+    showToast('Bağlantı iptal edildi.', 'error');
+    const btn = document.getElementById('connectBtn');
+    btn.innerHTML = 'Cüzdanı Bağla';
+    btn.disabled = false;
+  }
+}
+
+async function sendDonation() {
+  const amountStr = document.getElementById('amountInput').value.trim();
+  const message = document.getElementById('messageInput').value.trim();
+
+  if (!amountStr || isNaN(amountStr) || parseFloat(amountStr) <= 0) {
+    showToast('Geçerli bir miktar gir.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('donateBtn');
+  btn.innerHTML = '<span class="spin"></span>Onay bekleniyor...';
+  btn.disabled = true;
+
+  try {
+    const value = ethers.utils.parseUnits(amountStr, 18);
+    const tx = await contract.donate(message, { value: value });
+    btn.innerHTML = '<span class="spin"></span>İşleniyor...';
+    await tx.wait();
+
+    document.getElementById('amountInput').value = '';
+    document.getElementById('messageInput').value = '';
+    document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+
+    showToast('Bağışın zincire kaydedildi!');
+    await loadStats();
+  } catch(e) {
+    const msg = e.code === 4001 ? 'İşlem reddedildi.' : 'Hata oluştu, bakiyeni kontrol et.';
+    showToast(msg, 'error');
+  } finally {
+    btn.innerHTML = 'Bağışla';
+    btn.disabled = false;
+  }
+}
+
+async function loadStats() {
+  if (!contract) return;
+  try {
+    const total = await contract.totalDonated();
+    const count = await contract.donationCount();
+
+    document.getElementById('totalDonatedVal').innerHTML =
+      parseFloat(ethers.utils.formatUnits(total, 18)).toFixed(2) + ' <small>USDC</small>';
+    document.getElementById('donationCountVal').textContent = count.toString();
+
+    const recent = await contract.getRecentDonations(10);
+    renderDonations(recent);
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+function renderDonations(donations) {
+  const list = document.getElementById('donationsList');
+  const countEl = document.getElementById('donationsCount');
+
+  countEl.textContent = donations.length + ' gösteriliyor';
+
+  if (donations.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">◈</div><div class="empty-text">Henüz bağış yok.<br>İlk bağışı sen yap!</div></div>';
+    return;
+  }
+
+  list.innerHTML = '';
+  donations.forEach((d) => {
+    const date = new Date(d.timestamp.toNumber() * 1000);
+    const dateStr = date.toLocaleDateString('tr-TR', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+    const amountStr = parseFloat(ethers.utils.formatUnits(d.amount, 18)).toFixed(2);
+    const donorShort = d.donor.slice(0,6) + '...' + d.donor.slice(-4);
+
+    const card = document.createElement('div');
+    card.className = 'donation-card';
+    card.innerHTML = `
+      <div class="donation-top">
+        <div class="donation-amount">${amountStr} USDC</div>
+        <div class="donation-time">${dateStr}</div>
+      </div>
+      <div class="donation-donor">${donorShort}</div>
+      ${d.message ? `<div class="donation-message">${escapeHtml(d.message)}</div>` : ''}
+    `;
+    list.appendChild(card);
+  });
+}
+
+async function checkOwner() {
+  if (!contract || !currentAddress) return;
+  try {
+    contractOwner = await contract.owner();
+    if (contractOwner.toLowerCase() === currentAddress.toLowerCase()) {
+      document.getElementById('ownerPanel').classList.add('visible');
+      const balance = await contract.getContractBalance();
+      document.getElementById('contractBalanceText').textContent =
+        'Kontrat bakiyesi: ' + parseFloat(ethers.utils.formatUnits(balance, 18)).toFixed(4) + ' USDC';
+    }
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+async function withdrawFunds() {
+  const btn = document.getElementById('withdrawBtn');
+  btn.innerHTML = '<span class="spin"></span>Çekiliyor...';
+  btn.disabled = true;
+
+  try {
+    const tx = await contract.withdraw();
+    await tx.wait();
+    showToast('Bakiye cüzdanına çekildi!');
+    await checkOwner();
+    await loadStats();
+  } catch(e) {
+    const msg = e.code === 4001 ? 'İşlem reddedildi.' : 'Çekme işlemi başarısız, bakiye boş olabilir.';
+    showToast(msg, 'error');
+  } finally {
+    btn.innerHTML = 'Çek';
+    btn.disabled = false;
+  }
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
